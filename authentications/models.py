@@ -3,6 +3,7 @@ from django.contrib.auth.models import PermissionsMixin
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.utils.translation import gettext_lazy as _
 
+
 from authentications.managers import UserManager
 
 # Create your models here.
@@ -27,3 +28,15 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.first_name} - {self.last_name}"
+
+class OTP(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='otps')
+    otp_code = models.CharField(max_length=6, blank=True, null=True,)
+    is_verified = models.BooleanField(default=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = "OTPs"
+    
+    def __str__(self):
+        return f"OTP for {self.user.email}"

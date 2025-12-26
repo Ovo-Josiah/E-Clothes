@@ -1,8 +1,14 @@
+import random
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
-from authentications.models import User
+from authentications.models import User, OTP
+import random
+
+from django.utils import timezone
+from datetime import timedelta
+from django.core.mail import send_mail
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -120,3 +126,43 @@ class ChangePasswordSerializer(serializers.Serializer):
             user.set_password(self.validated_data['new_password'])
             user.save()
             return user
+        
+class OTPRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=255, required=True)
+
+
+    def validate(self, attrs):
+        email = attrs.get('email')
+
+        user = User.objects.filter(email=email).first()
+
+        if not user:
+            raise serializers.ValidationError("Invalid email")
+        
+        attrs['user'] = user
+        return attrs
+    
+
+    def save(self, **kwargs):
+        user = self.validated_data['user']
+
+       
+        # Genrate OTP pin
+        pin = str(random.randrange(1000,10000))
+
+        # otp , created = OTP.objects.update_or_create(is_verified = False, expires_at = timezone.now() + timedelta(minutes=5),user = user, otp_code = pin)
+        otp , created = OTP.objects.update_or_create(defaults={'is_verified': False, 'expires_at': timezone.now() + timedelta(minutes=5), 'otp_code': pin}, user = user)
+
+        message = f''' Your one time OTP code is {otp.otp_code}, and it expires in 5 minutes '''
+
+        send_mail(
+            subject= "One timeOTP code",
+            message= message ,
+            from_email = "alojosiah6@gmail.com",
+            recipient_list = [user.email],
+            fail_silently = False,
+        )  
+
+        return otp 
+
+       

@@ -5,7 +5,7 @@ from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from authentications.models import User
-from authentications.serializers import ChangePasswordSerializer, UserLoginSerializer, UserLogoutSerializer, UserSerializer
+from authentications.serializers import ChangePasswordSerializer, OTPRequestSerializer, UserLoginSerializer, UserLogoutSerializer, UserSerializer, VerifyOTPSerializer
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 
@@ -14,20 +14,6 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, Bl
 
 
 # Create your views here.
-# class UserCreateView(APIView):
-    # permission_classes = [AllowAny]
-
-    # @swagger_auto_schema(
-    #     request_body=UserSerializer,
-    #     responses={201: UserSerializer}
-    # )
-    # def post(self, request):
-    #     serializer = UserSerializer(data=request.data)
-    #     if serializer.is_valid():
-    #         user = serializer.save()
-    #         return Response(user, status=status.HTTP_201_CREATED)
-    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 class UserCreateView(CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -104,4 +90,31 @@ class ChangePasswordView(generics.GenericAPIView):
 
         return Response({
             'message': 'Password changed successfully'
+        }, status=status.HTTP_200_OK)
+    
+
+class OTPRequestView(generics.GenericAPIView):
+    serializer_class = OTPRequestSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data = request.data)
+        serializer.is_valid(raise_exception = True)
+        serializer.save()
+
+        return Response({   
+            'message': 'OTP sent successfully'
+        }, status=status.HTTP_200_OK)
+    
+class OTPVerificatioView(generics.GenericAPIView):
+    serializer_class = VerifyOTPSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = self.get_serializer(data = request.data)
+        serializer.is_valid(raise_exception = True)
+        serializer.save()
+
+        return Response({
+            'message': 'OTP verified successfully'
         }, status=status.HTTP_200_OK)

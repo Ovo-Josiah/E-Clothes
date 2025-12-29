@@ -9,6 +9,7 @@ import random
 from django.utils import timezone
 from datetime import timedelta
 from django.core.mail import send_mail
+import secrets
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -137,7 +138,7 @@ class OTPRequestSerializer(serializers.Serializer):
         user = User.objects.filter(email=email).first()
 
         if not user:
-            raise serializers.ValidationError("Invalid email")
+            raise serializers.ValidationError("User does not exist")
         
         attrs['user'] = user
         return attrs
@@ -148,7 +149,8 @@ class OTPRequestSerializer(serializers.Serializer):
 
        
         # Genrate OTP pin
-        pin = str(random.randrange(1000,10000))
+        # pin = str(random.randrange(1000,10000))
+        pin = str(secrets.randbelow(9000) + 1000)
 
         # otp , created = OTP.objects.update_or_create(is_verified = False, expires_at = timezone.now() + timedelta(minutes=5),user = user, otp_code = pin)
         otp , created = OTP.objects.update_or_create(defaults={'is_verified': False, 'expires_at': timezone.now() + timedelta(minutes=5), 'otp_code': pin}, user = user)
@@ -165,4 +167,31 @@ class OTPRequestSerializer(serializers.Serializer):
 
         return otp 
 
-       
+class VerifyOTPSerializer(serializers.Serializer):
+    otp_code = serializers.CharField(required = True, write_only = True, max_length = 4, min_length = 4)
+    
+
+    def validate(self, attrs):
+        otp_input_code = attrs.get('otp_code')
+        user = self.context['request'].user
+
+        try:
+            otp = user.otps
+        except AttributeError:
+            raise serializers.ValidationError("No OTP request found.")
+
+        if len(otp_input_code) != 4:
+            raise serializers.ValidationError('Invalid OTP code')
+
+        if timezone.now() >  user.otps.expires_at:
+            raise serializers.ValidationError('OTP has expired.')
+
+        if otp.is_verified:
+            raise serializers.ValidationError("OTP already used.")
+
+        if otp.otp_code != otp_input_code:
+            raise serializers.ValidationError('Invalid OTP code.')
+        
+        attrs['otp'] = otp
+        return attrs
+

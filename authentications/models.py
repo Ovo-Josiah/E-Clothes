@@ -1,3 +1,4 @@
+from datetime import timedelta, timezone
 from django.db import models
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -5,6 +6,9 @@ from django.utils.translation import gettext_lazy as _
 
 
 from authentications.managers import UserManager
+
+def default_otp_expiry():
+    return timezone.now() + timedelta(minutes=5)
 
 # Create your models here.
 class User(AbstractBaseUser, PermissionsMixin):
@@ -32,8 +36,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 class OTP(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='otps')
     otp_code = models.CharField(max_length=6, blank=True, null=True,)
-    is_verified = models.BooleanField(default=True)
-    expires_at = models.DateTimeField(blank=True, null=True)
+    is_verified = models.BooleanField(default=False)
+    expires_at = models.DateTimeField(blank=True, null=True, default= default_otp_expiry)
+    is_used = models.BooleanField(default=False)
 
     class Meta:
         verbose_name_plural = "OTPs"

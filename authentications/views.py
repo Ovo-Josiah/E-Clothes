@@ -5,7 +5,7 @@ from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from authentications.models import User
-from authentications.serializers import ChangePasswordSerializer, OTPRequestSerializer, UserLoginSerializer, UserLogoutSerializer, UserSerializer, VerifyOTPSerializer
+from authentications.serializers import ChangePasswordSerializer, OTPRequestSerializer, UserLoginSerializer, UserLogoutSerializer, UserOtpNewPasswordSerializer, UserSerializer, VerifyOTPSerializer
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 
@@ -117,4 +117,24 @@ class OTPVerificatioView(generics.GenericAPIView):
 
         return Response({
             'message': 'OTP verified successfully'
+        }, status=status.HTTP_200_OK)
+    
+
+class UserOtpNewPasswordView(generics.GenericAPIView):
+    serializer_class = UserOtpNewPasswordSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data = request.data)
+        serializer.is_valid(raise_exception = True)
+
+        user = serializer.validated_data['user']
+        
+        otp = OTP.objects.filter(user=user).first()
+
+        if otp.is_verified != True:
+            return Response({'message': 'OTP is not verified'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+
+        return Response({
+            'message': 'Password changed successfully'
         }, status=status.HTTP_200_OK)

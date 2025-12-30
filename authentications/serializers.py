@@ -10,6 +10,8 @@ from django.utils import timezone
 from datetime import timedelta
 from django.core.mail import send_mail
 import secrets
+from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -173,25 +175,51 @@ class VerifyOTPSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         otp_input_code = attrs.get('otp_code')
-        user = self.context['request'].user
+        # user = self.context['request'].user
 
-        try:
-            otp = user.otps
-        except AttributeError:
-            raise serializers.ValidationError("No OTP request found.")
+       
+        otp = OTP.objects.filter(otp_code=otp_input_code, is_verified=False).first()
+        if not otp:
+            raise serializers.ValidationError("Invalid or expired OTP.")
 
-        if len(otp_input_code) != 4:
-            raise serializers.ValidationError('Invalid OTP code')
-
-        if timezone.now() >  user.otps.expires_at:
+        if timezone.now() >  otp.expires_at:
             raise serializers.ValidationError('OTP has expired.')
 
-        if otp.is_verified:
-            raise serializers.ValidationError("OTP already used.")
-
-        if otp.otp_code != otp_input_code:
-            raise serializers.ValidationError('Invalid OTP code.')
-        
         attrs['otp'] = otp
         return attrs
+    
+    def save(self, **kwargs):
+        user = self.validated_data['user']
 
+        otp, _ = OTP.objects.update_or_create(user=user, defaults={'is_verified': True,})
+
+        return otp
+
+class UserOtpNewPasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(max_length = 100,write_only=True, required=True, min_length=6)
+    confirm_password = serializers.CharField(max_length = 100,write_only=True, required=True, min_length=6)
+
+    def validate(self, attrs):
+        password = attrs.get("new_password")
+        confirm = attrs.get("confirm_password")
+
+        if password != confirm:
+            raise serializers.ValidationError({
+                "confirm_password": "Passwords do not match"
+            })
+
+        # Django password validators
+        validate_password(password)
+
+        return attrs
+
+
+    @transaction.atomic
+    def save(self, **kwargs):
+        request = self.context.get("request")
+        user = request.user
+
+        user.set_password(self.validated_data["new_password"])
+        user.save(update_fields=["password"])
+
+        return user

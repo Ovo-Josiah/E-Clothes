@@ -152,10 +152,33 @@ class OTPRequestSerializer(serializers.Serializer):
        
         # Genrate OTP pin
         # pin = str(random.randrange(1000,10000))
-        pin = str(secrets.randbelow(9000) + 1000)
+        # pin = str(secrets.randbelow(9000) + 1000)
 
         # otp , created = OTP.objects.update_or_create(is_verified = False, expires_at = timezone.now() + timedelta(minutes=5),user = user, otp_code = pin)
-        otp , created = OTP.objects.update_or_create(defaults={'is_verified': False, 'expires_at': timezone.now() + timedelta(minutes=5), 'otp_code': pin}, user = user)
+        otp = getattr(user, 'otps', None)
+
+        if otp and otp.is_verified and not otp.is_used and otp.expires_at > timezone.now():
+            otp_code = otp.otp_code  # reuse existing verified OTP
+        else:
+            # Generate new OTP pin
+            otp_code = str(secrets.randbelow(9000) + 1000)
+
+            if otp:
+                # Update existing OTP record
+                otp.otp_code = otp_code
+                otp.is_verified = False
+                otp.is_used = False
+                otp.expires_at = timezone.now() + timedelta(minutes=5)
+                otp.save(update_fields=['otp_code', 'is_verified', 'is_used', 'expires_at'])
+            else:
+                # Create new OTP record
+                otp = OTP.objects.create(
+                    user=user,
+                    otp_code=otp_code,
+                    is_verified=False,
+                    is_used=False,
+                    expires_at=timezone.now() + timedelta(minutes=5)
+                )
 
         message = f''' Your one time OTP code is {otp.otp_code}, and it expires in 5 minutes '''
 
@@ -194,6 +217,24 @@ class VerifyOTPSerializer(serializers.Serializer):
         otp, _ = OTP.objects.update_or_create(user=user, defaults={'is_verified': True,})
 
         return otp
+
+class VerifyOTPSerializer(serializers.Serializer):
+    otp_code = serializers.CharField(required = True, write_only = True, max_length = 4, min_length = 4)
+
+    def validate(self, attrs):
+        otp_input_code = attrs.get('otp_code')
+
+        otp = getattr(User, 'otps', None)
+
+        if otp.otp_code != otp_input_code:
+            raise serializers.ValidationError("Invalid or expired OTP.")
+        
+        if timezone.now() >  otp.expires_at:
+            raise serializers.ValidationError('OTP has expired.')
+
+        attrs['otp'] = otp        
+        return attrs
+
 
 class UserOtpNewPasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(max_length = 100,write_only=True, required=True, min_length=6)

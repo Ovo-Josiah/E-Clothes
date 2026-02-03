@@ -103,7 +103,8 @@ class OTPRequestView(generics.GenericAPIView):
         serializer.save()
 
         return Response({   
-            'message': 'OTP sent successfully'
+            'message': 'OTP sent successfully',
+            'token': serializer.payload['reset_token']
         }, status=status.HTTP_200_OK)
     
 class OTPVerificatioView(generics.GenericAPIView):

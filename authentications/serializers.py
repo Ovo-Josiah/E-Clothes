@@ -166,6 +166,12 @@ class OTPRequestSerializer(serializers.Serializer):
             expires_at=timezone.now() + timedelta(minutes=5)
         )
 
+        reset_token = ResetToken.objects.create(
+            user=user,
+            expires_at=timezone.now() + timedelta(minutes=5),
+            is_used=False
+        )
+
         message = f''' Your one time OTP code is {otp.otp_code}, and it expires in 5 minutes '''
 
         send_mail(
@@ -175,8 +181,13 @@ class OTPRequestSerializer(serializers.Serializer):
             recipient_list = [user.email],
             fail_silently = False,
         )  
-
-        return otp 
+        
+        payload = {
+            'otp_code': otp.otp_code,
+            'reset_token' : reset_token.token
+        }
+        return payload
+        # return otp 
 
 # class VerifyOTPSerializer(serializers.Serializer):
 #     otp_code = serializers.CharField(required = True, write_only = True, max_length = 4, min_length = 4)
@@ -233,16 +244,6 @@ class VerifyOTPSerializer(serializers.Serializer):
         user = self.validated_data['user']
 
         reset_token = getattr(user, 'resettoken', None)
-
-        # Generate a new reset token
-        # if reset_token and not reset_token.is_used and reset_token.expires_at > timezone.now():
-        #     token = ResetToken.objects.update()
-        # else:
-        #     token = ResetToken.objects.create(
-        #         user=user,
-        #         expires_at=timezone.now() + timedelta(minutes=5),
-        #         is_used=False
-        #     )
 
         if not reset_token:
             token = ResetToken.objects.create(

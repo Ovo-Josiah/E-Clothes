@@ -1,4 +1,5 @@
 from datetime import timedelta, timezone
+import uuid
 from django.db import models
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -45,3 +46,19 @@ class OTP(models.Model):
     
     def __str__(self):
         return f"OTP for {self.user.email}"
+
+class ResetToken(models.Model):
+    user= models.ForeignKey(User, on_delete=models.CASCADE, related_name='resettoken')
+    token =  models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(blank=True, null=True, default= default_otp_expiry)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name_plural = "Reset Tokens"
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def __str__(self):  
+        return f"Reset Token for {self.user.email}"

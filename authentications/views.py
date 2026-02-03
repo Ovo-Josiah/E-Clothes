@@ -108,7 +108,7 @@ class OTPRequestView(generics.GenericAPIView):
     
 class OTPVerificatioView(generics.GenericAPIView):
     serializer_class = VerifyOTPSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = self.get_serializer(data = request.data)

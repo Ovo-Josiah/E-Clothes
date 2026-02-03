@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
-from authentications.models import User, OTP
+from authentications.models import ResetToken, User, OTP
 import random
 
 from django.utils import timezone
@@ -149,37 +149,22 @@ class OTPRequestSerializer(serializers.Serializer):
     def save(self, **kwargs):
         user = self.validated_data['user']
 
-        # otp , created = OTP.objects.update_or_create(is_verified = False, expires_at = timezone.now() + timedelta(minutes=5),user = user, otp_code = pin)
+      
         otp = getattr(user, 'otps', None)
 
-        if otp and otp.is_verified and not otp.is_used:
-            raise serializers.ValidationError(
-                "OTP already verified. Proceed to reset password."
-            )
-
-        if otp and otp.is_verified and not otp.is_used and otp.expires_at > timezone.now():
-            otp_code = otp.otp_code  # reuse existing verified OTP
-        else:
-            # Generate new OTP pin
-            otp_code = str(secrets.randbelow(9000) + 1000)
-            expires_at = timezone.now() + timedelta(minutes=5)
-
-            if otp:
-                # Update existing OTP record
-                otp.otp_code = otp_code
-                otp.is_verified = False
-                otp.is_used = False
-                otp.expires_at = expires_at
-                otp.save(update_fields=['otp_code', 'is_verified', 'is_used', 'expires_at'])
-            else:
-                # Create new OTP record
-                otp = OTP.objects.create(
-                    user=user,
-                    otp_code=otp_code,
-                    is_verified=False,
-                    is_used=False,
-                    expires_at=timezone.now() + timedelta(minutes=5)
-                )
+        if otp: 
+            otp.delete()
+               
+        otp_code = str(secrets.randbelow(9000) + 1000)
+        # expires_at = timezone.now() + timedelta(minutes=5)
+        # Create new OTP record
+        otp = OTP.objects.create(
+            user=user,
+            otp_code=otp_code,
+            is_verified=False,
+            is_used=False,
+            expires_at=timezone.now() + timedelta(minutes=5)
+        )
 
         message = f''' Your one time OTP code is {otp.otp_code}, and it expires in 5 minutes '''
 
@@ -193,31 +178,87 @@ class OTPRequestSerializer(serializers.Serializer):
 
         return otp 
 
-class VerifyOTPSerializer(serializers.Serializer):
-    otp_code = serializers.CharField(required = True, write_only = True, max_length = 4, min_length = 4)
+# class VerifyOTPSerializer(serializers.Serializer):
+#     otp_code = serializers.CharField(required = True, write_only = True, max_length = 4, min_length = 4)
     
+
+#     def validate(self, attrs):
+#         otp_input_code = attrs.get('otp_code')
+#         # user = self.context['request'].user
+
+       
+#         otp = OTP.objects.filter(otp_code=otp_input_code, is_verified=False).first()
+#         if not otp:
+#             raise serializers.ValidationError("Invalid or expired OTP.")
+
+#         if timezone.now() >  otp.expires_at:
+#             raise serializers.ValidationError('OTP has expired.')
+
+#         attrs['otp'] = otp
+#         return attrs
+    
+#     def save(self, **kwargs):
+#         user = self.validated_data['user']
+
+#         otp, _ = OTP.objects.update_or_create(user=user, defaults={'is_verified': True,})
+
+#         return otp
+
+class VerifyOTPSerializer(serializers.Serializer):
+    otp_code = serializers.CharField(
+        required=True, write_only=True, max_length=4, min_length=4
+    )
 
     def validate(self, attrs):
         otp_input_code = attrs.get('otp_code')
-        # user = self.context['request'].user
 
-       
-        otp = OTP.objects.filter(otp_code=otp_input_code, is_verified=False).first()
+        otp = OTP.objects.filter(
+            otp_code=otp_input_code,
+            is_verified=False
+        ).first()
+
         if not otp:
             raise serializers.ValidationError("Invalid or expired OTP.")
 
-        if timezone.now() >  otp.expires_at:
-            raise serializers.ValidationError('OTP has expired.')
+        if timezone.now() > otp.expires_at:
+            raise serializers.ValidationError("OTP has expired.")
 
+        # ✅ inject otp and user into validated_data
         attrs['otp'] = otp
+        attrs['user'] = otp.user
         return attrs
-    
+
     def save(self, **kwargs):
+        otp = self.validated_data['otp']
         user = self.validated_data['user']
 
-        otp, _ = OTP.objects.update_or_create(user=user, defaults={'is_verified': True,})
+        reset_token = getattr(user, 'resettoken', None)
 
-        return otp
+        # Generate a new reset token
+        # if reset_token and not reset_token.is_used and reset_token.expires_at > timezone.now():
+        #     token = ResetToken.objects.update()
+        # else:
+        #     token = ResetToken.objects.create(
+        #         user=user,
+        #         expires_at=timezone.now() + timedelta(minutes=5),
+        #         is_used=False
+        #     )
+
+        if not reset_token:
+            token = ResetToken.objects.create(
+                user=user,
+                expires_at=timezone.now() + timedelta(minutes=5),
+                is_used=False
+            )
+        else:
+            if reset_token.token and not reset_token.is_used and reset_token.expires_at > timezone.now():
+                token = reset_token.save(update_fields = ['token']) 
+
+        otp.is_verified = True
+        otp.save()
+
+        return token 
+
 
 # class VerifyOTPSerializer(serializers.Serializer):
 #     otp_code = serializers.CharField(required = True, write_only = True, max_length = 4, min_length = 4)

@@ -100,11 +100,11 @@ class OTPRequestView(generics.GenericAPIView):
     def post(self, request):
         serializer = self.get_serializer(data = request.data)
         serializer.is_valid(raise_exception = True)
-        serializer.save()
+        payload = serializer.save()
 
         return Response({   
             'message': 'OTP sent successfully',
-            'token': serializer.payload['reset_token']
+            'token': payload['reset_token']
         }, status=status.HTTP_200_OK)
     
 class OTPVerificatioView(generics.GenericAPIView):
@@ -114,10 +114,13 @@ class OTPVerificatioView(generics.GenericAPIView):
     def post(self, request):
         serializer = self.get_serializer(data = request.data)
         serializer.is_valid(raise_exception = True)
-        serializer.save()
+        payload = serializer.save()
+
+         
 
         return Response({
-            'message': 'OTP verified successfully'
+            'message': 'OTP verified successfully',
+            'token': payload['token']
         }, status=status.HTTP_200_OK)
     
 

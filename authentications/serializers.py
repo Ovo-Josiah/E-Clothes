@@ -183,127 +183,103 @@ class OTPRequestSerializer(serializers.Serializer):
         )  
         
         payload = {
-            'otp_code': otp.otp_code,
             'reset_token' : reset_token.token
         }
         return payload
-        # return otp 
-
-# class VerifyOTPSerializer(serializers.Serializer):
-#     otp_code = serializers.CharField(required = True, write_only = True, max_length = 4, min_length = 4)
-    
-
-#     def validate(self, attrs):
-#         otp_input_code = attrs.get('otp_code')
-#         # user = self.context['request'].user
-
        
-#         otp = OTP.objects.filter(otp_code=otp_input_code, is_verified=False).first()
-#         if not otp:
-#             raise serializers.ValidationError("Invalid or expired OTP.")
-
-#         if timezone.now() >  otp.expires_at:
-#             raise serializers.ValidationError('OTP has expired.')
-
-#         attrs['otp'] = otp
-#         return attrs
-    
-#     def save(self, **kwargs):
-#         user = self.validated_data['user']
-
-#         otp, _ = OTP.objects.update_or_create(user=user, defaults={'is_verified': True,})
-
-#         return otp
-
 class VerifyOTPSerializer(serializers.Serializer):
     otp_code = serializers.CharField(
         required=True, write_only=True, max_length=4, min_length=4
     )
+    token = serializers.CharField(required=True, write_only=True, max_length=255)
 
     def validate(self, attrs):
         otp_input_code = attrs.get('otp_code')
+        token = attrs.get('token')
 
         otp = OTP.objects.filter(
             otp_code=otp_input_code,
             is_verified=False
         ).first()
 
-        if not otp:
+        tkn = ResetToken.objects.filter(token=token).first()
+
+        if not otp :
             raise serializers.ValidationError("Invalid or expired OTP.")
 
         if timezone.now() > otp.expires_at:
             raise serializers.ValidationError("OTP has expired.")
 
+        if not tkn: 
+            raise serializers.ValidationError("Error validation.")
+
+        if tkn and timezone.now() > tkn.expires_at:
+            raise serializers.ValidationError("Session expired.")
+
         # ✅ inject otp and user into validated_data
         attrs['otp'] = otp
         attrs['user'] = otp.user
+        attrs['tkn'] = tkn
         return attrs
 
     def save(self, **kwargs):
         otp = self.validated_data['otp']
         user = self.validated_data['user']
+        tkn = self.validated_data['tkn']
 
-        reset_token = getattr(user, 'resettoken', None)
-
-        if not reset_token:
-            token = ResetToken.objects.create(
-                user=user,
-                expires_at=timezone.now() + timedelta(minutes=5),
-                is_used=False
-            )
-        else:
-            if reset_token.token and not reset_token.is_used and reset_token.expires_at > timezone.now():
-                token = reset_token.save(update_fields = ['token']) 
-
+        # tkn.is_used = True
+        # tkn.save()
         otp.is_verified = True
         otp.save()
+        token = tkn.token
 
-        return token 
-
-
-# class VerifyOTPSerializer(serializers.Serializer):
-#     otp_code = serializers.CharField(required = True, write_only = True, max_length = 4, min_length = 4)
-
-#     def validate(self, attrs):
-#         otp_input_code = attrs.get('otp_code')
-
-#         otp = getattr(User, 'otps', None)
-
-#         if otp.otp_code != otp_input_code:
-#             raise serializers.ValidationError("Invalid or expired OTP.")
-        
-#         if timezone.now() >  otp.expires_at:
-#             raise serializers.ValidationError('OTP has expired.')
-
-#         attrs['otp'] = otp        
-#         return attrs
+        payload = {
+            'token':token
+        }
+        return payload
 
 
 class UserOtpNewPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True, write_only=True, max_length=255)
     new_password = serializers.CharField(max_length = 100,write_only=True, required=True, min_length=6)
     confirm_password = serializers.CharField(max_length = 100,write_only=True, required=True, min_length=6)
 
     def validate(self, attrs):
+        token = attrs.get("token")
         password = attrs.get("new_password")
         confirm = attrs.get("confirm_password")
 
         if password != confirm:
-            raise serializers.ValidationError({
+                raise serializers.ValidationError({
                 "confirm_password": "Passwords do not match"
             })
 
-        # Django password validators
-        validate_password(password)
+        token = ResetToken.objects.filter(token=token).first()
 
+        if not token:
+            raise serializers.ValidationError("Invalid reset token.")
+        
+        if token.is_used == True:
+            raise serializers.ValidationError("Token already used")
+
+        if timezone.now() >  token.expires_at :
+                raise serializers.ValidationError("Session expired.")
+        
+        user = token.user
+        validate_password(password, user=user)
+        attrs['password'] = password
+        attrs['token'] = token
+        attrs['user'] = user
         return attrs
-
 
     @transaction.atomic
     def save(self, **kwargs):
-        request = self.context.get("request")
-        user = request.user
+        token = self.validated_data['token']
+        user = self.validated_data['user']
 
-        user.set_password(self.validated_data["new_password"])
+        user.set_password(self.validated_data["password"])
         user.save(update_fields=["password"])
+        token.is_used = True
+        token.save()
 
         return user

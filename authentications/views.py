@@ -138,3 +138,7 @@ class UserOtpNewPasswordView(generics.GenericAPIView):
         return Response({
             'message': payload['message']
         }, status=status.HTTP_200_OK)
+    
+
+class UserProfileView(generics.GenericAPIView):
+    pass

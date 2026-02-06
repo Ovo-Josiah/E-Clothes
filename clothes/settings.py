@@ -142,3 +142,16 @@ EMAIL_PORT = 465
 EMAIL_USE_SSL = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': [
+        # 'rest_framework.throttling.AnonRateThrottle',
+        # 'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        # 'anon': '3/minutes',
+        # 'user': '1000/day'
+        'otp': '5/minutes'
+    }
+}

@@ -9,6 +9,7 @@ from authentications.serializers import ChangePasswordSerializer, OTPRequestSeri
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 
@@ -94,6 +95,8 @@ class ChangePasswordView(generics.GenericAPIView):
     
 
 class OTPRequestView(generics.GenericAPIView):
+    throttle_scope = 'otp'
+    throttle_classes = [ScopedRateThrottle]
     serializer_class = OTPRequestSerializer
     permission_classes = [AllowAny]
 

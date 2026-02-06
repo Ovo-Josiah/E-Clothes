@@ -230,7 +230,7 @@ class VerifyOTPSerializer(serializers.Serializer):
         # tkn.is_used = True
         # tkn.save()
         otp.is_verified = True
-        otp.save()
+        otp.save(update_fields=['is_verified'])
         token = tkn.token
 
         payload = {
@@ -266,7 +266,11 @@ class UserOtpNewPasswordSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Session expired.")
         
         user = token.user
-        validate_password(password, user=user)
+        try:
+            validate_password(password, user=token.user)
+        except Exception as e:
+            raise serializers.ValidationError({"new_password": list(e.messages)})
+        
         attrs['password'] = password
         attrs['token'] = token
         attrs['user'] = user
@@ -276,10 +280,14 @@ class UserOtpNewPasswordSerializer(serializers.Serializer):
     def save(self, **kwargs):
         token = self.validated_data['token']
         user = self.validated_data['user']
+        password = self.validated_data['password']
 
-        user.set_password(self.validated_data["password"])
+        user.set_password(password)
         user.save(update_fields=["password"])
         token.is_used = True
-        token.save()
+        token.save(update_fields=['is_used'])
 
-        return user
+        payload = {
+            'message': "Password reset successfully"
+        }
+        return payload

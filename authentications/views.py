@@ -130,15 +130,8 @@ class UserOtpNewPasswordView(generics.GenericAPIView):
     def post(self, request):
         serializer = self.get_serializer(data = request.data)
         serializer.is_valid(raise_exception = True)
-
-        user = serializer.validated_data['user']
-        
-        otp = OTP.objects.filter(user=user).first()
-
-        if otp.is_verified != True:
-            return Response({'message': 'OTP is not verified'}, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save()
+        payload = serializer.save()
 
         return Response({
-            'message': 'Password changed successfully'
+            'message': payload['message']
         }, status=status.HTTP_200_OK)

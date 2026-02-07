@@ -1,11 +1,11 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from authentications.models import User
-from authentications.serializers import ChangePasswordSerializer, OTPRequestSerializer, UserLoginSerializer, UserLogoutSerializer, UserOtpNewPasswordSerializer, UserSerializer, VerifyOTPSerializer
+from authentications.serializers import ChangePasswordSerializer, OTPRequestSerializer, UserLoginSerializer, UserLogoutSerializer, UserOtpNewPasswordSerializer, UserProfileSerializer, UserSerializer, VerifyOTPSerializer
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 
@@ -140,5 +140,47 @@ class UserOtpNewPasswordView(generics.GenericAPIView):
         }, status=status.HTTP_200_OK)
     
 
-class UserProfileView(generics.GenericAPIView):
-    pass
+class UserListView(generics.GenericAPIView):
+    serializer_class = UserProfileSerializer
+
+    def get(self, request):
+        users = User.objects.all()
+        serializer = UserProfileSerializer(users, many = True)
+        return Response(
+            {
+                "users":serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class UserDetailView(generics.RetrieveAPIView):
+    serializer_class = UserProfileSerializer
+    queryset = User.objects.all()
+    
+
+
+# class UserDetailView(generics.GenericAPIView):
+#     serializer_class = UserProfileSerializer
+
+#     def get(self, request, id):
+#         user = get_object_or_404(User, id=id)
+#         serializer = self.get_serializer(user)
+#         return Response(
+#             {
+#                 "user":serializer.data
+#             },
+#             status=status.HTTP_200_OK
+#         ) 
+
+# class UserView(APIView):
+
+#     def get(self, request, id):
+#         user =  get_object_or_404(User, id=id)
+#         serializer = UserProfileSerializer(user)
+#         return Response(
+#             {
+#                 "user":serializer.data
+#             },
+#             status=status.HTTP_200_OK
+#         )

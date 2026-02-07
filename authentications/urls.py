@@ -1,6 +1,6 @@
 from django.urls import path,include
 
-from authentications.views import ChangePasswordView, OTPRequestView, UserCreateView, UserLoginView, UserLogoutView,OTPVerificatioView, UserOtpNewPasswordView
+from authentications.views import ChangePasswordView, OTPRequestView, UserCreateView,  UserDetailView,  UserListView, UserLoginView, UserLogoutView,OTPVerificatioView, UserOtpNewPasswordView
 urlpatterns = [
     path('auth/register/',UserCreateView.as_view(), name='register-user'),
     path('auth/login/',UserLoginView.as_view(), name='login-user'),
@@ -9,4 +9,7 @@ urlpatterns = [
     path('auth/otp-request/',OTPRequestView.as_view(), name='otp-request'),
     path('auth/otp-verification/',OTPVerificatioView.as_view(), name='otp-request'),
     path('auth/otp-new-password/',UserOtpNewPasswordView.as_view(), name='otp-new-password'),
+    path('auth/users/',UserListView.as_view(), name='list-users'),
+    path('auth/retrieve-user/<int:pk>',UserDetailView.as_view(), name='retrieve-user'),
+   
 ]
